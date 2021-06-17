@@ -1,0 +1,117 @@
+= Package fsmod
+
+image:https://pkg.go.dev/badge/github.com/DavidGamba/dgtools/fsmod.svg[Go Reference, link="https://pkg.go.dev/github.com/DavidGamba/dgtools/fsmod"]
+
+Provides ways to query files for modification.
+
+There are a couple of ways in which modifications can be detected:
+
+- Checking the file modification timestamp.
+- By comparing a hash against a known.
+
+The modification timestamp is the most intuitive method for building based on file changes and it is the main focus of this library.
+
+The hash is useful to compare downloaded binaries to verify the current version matches the expected version.
+
+== Functions to implement
+
+`fsmod.ExpandGlob(glob...) []filepath` - Given one or more globs it returns the filename of the files or directories that the glob matched.
+The syntax matches that of https://golang.org/pkg/path/filepath/#Match
+
+`fsmod.ExpandDir(recursive, dir...) []filepath` - Returns a file list for one or more directories (optionally recursively).
+
+`fsmod.FilterFileExists([]filepath) ([]filepath, []filepath)` - Given a list of files it returns the sublist of files that actually exist and the ones that don't.
+
+`fsmod.FilesLatestModTime([]filepath) (filepath, modtime, error)` - Checks one or more files and returns the latest mod time and the filename that was modified last.
+If a directory is given, it is ignored.
+
+`fsmod.FilesOldestModTime([]filepath) (filepath, modtime, error)` - Checks one or more files and returns the oldest mod time and the filename that was modified first.
+If a directory is given, it is ignored.
+
+`fsmod.FilesNewerThan(modtime, []filepath) []filepath` - Checks one or more files and returns the latest mod time and the filename that was modified last.
+If a directory is given, it is ignored.
+
+`fsmod.FileSha1(filepath, hash) (bool, err)` - Check if the file Sha1 matches the expected value.
+
+`fsmod.FileMD5(filepath, hash) (bool, err)` - Check if the file MD5 matches the expected value.
+
+Example:
+
+Expand a dir with golden test files:
+
+----
+goldenFilepaths, err := fsmod.ExpandDir(true, "testfiles/good/", "testfiles/bad/")
+----
+
+Find a list of sources:
+
+----
+sourceFilepaths, err := fsmod.ExpandGlob("go.mod", "go.sum", "*.go", "mylib/*.go")
+----
+
+Filter out non existent files, for example, the `go.sum` might not exist for a newly created project.
+
+----
+filteredSourceFilepaths, nonExistentFilepaths := fsmod.FilterFileExists(sourceFilepaths)
+----
+
+Get their latest modification time:
+
+----
+filepath, srcModtime, err := fsmod.FilesLatestModTime(append(filteredSourceFilepaths, goldenFilepaths))
+----
+
+Get your go binary modification time:
+
+----
+_, targetModtime, err := fsmod.FilesOldestModTime([]string{"mygobinary"})
+----
+
+Compare mod time and act on it:
+
+----
+if targetModtime.Before(srcModtime) || len(nonExistentFilepaths) > 0 {
+  // go test and go build
+} else {
+  // up to date!
+}
+----
+
+Another approach:
+
+Get your go binary modification time:
+
+----
+_, targetModtime, err := fsmod.FilesOldestModTime([]string{"mygobinary"})
+----
+
+Get sources modified after the target:
+
+----
+newerFiles, err := fsmod.FilesNewerThan(targetModtime, append(filteredSourceFilepaths, goldenFilepaths))
+----
+
+Act on len of newer files:
+
+----
+if len(newerFiles) > 0 || len(nonExistentFilepaths) > 0 {
+  // go test and go build
+} else {
+  // up to date!
+}
+----
+
+== Getting file changes in CI environments
+
+A fresh clone or a branch checkout in a CI environment will have all files modified at practically the same time without considering the actual modification time at the source.
+Doing a query to your VCS for files changed since a known commit is a good way to bypass this problem.
+
+== LICENSE
+
+This file is part of fsmod.
+
+Copyright (C) 2021  David Gamba Rios
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
