@@ -2,7 +2,7 @@
 
 image:https://pkg.go.dev/badge/github.com/DavidGamba/dgtools/fsmod.svg[Go Reference, link="https://pkg.go.dev/github.com/DavidGamba/dgtools/fsmod"]
 
-Provides ways to query files for modification.
+Provides ways to query files to validate if they have been modified or if they differ from what it is expected.
 
 There are a couple of ways in which modifications can be detected:
 
